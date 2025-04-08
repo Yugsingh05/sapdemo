@@ -5,34 +5,38 @@ import { useFormik } from "formik";
 import * as Yup from "yup";
 import { X } from "lucide-react";
 import axios from "axios";
-import { redirect } from "next/dist/server/api-utils";
+import { Canvas } from "@react-three/fiber";
+import { OrbitControls, Stage } from "@react-three/drei";
+import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader";
+import { useLoader } from "@react-three/fiber";
+
+
+function ModelViewer({ url }) {
+  const gltf = useLoader(GLTFLoader, url);
+  if (!gltf) return <p className="text-red-500">Failed to load model.</p>;
+  return <primitive object={gltf.scene} scale={1.2} />;
+}
+
 
 export default function ImageUploadPage() {
   const [preview, setPreview] = useState(null);
-  const fileInputRef = useRef(null); // ref for the file input
+  const [modelUrl, setModelUrl] = useState(null);
+  const fileInputRef = useRef(null);
 
   const formik = useFormik({
-    initialValues: {
-      image: null,
-    },
+    initialValues: { image: null },
     validationSchema: Yup.object({
       image: Yup.mixed()
         .required("Image is required")
-        .test(
-          "fileType",
-          "Unsupported file format",
-          (value) =>
-            value && ["image/jpeg", "image/png", "image/webp"].includes(value.type)
+        .test("fileType", "Unsupported file format", (value) =>
+          value && ["image/jpeg", "image/png", "image/webp"].includes(value.type)
         ),
     }),
     onSubmit: async (values) => {
-      console.log("Image file:", values.image);
-
-      // Convert file to base64 Data URI
       const getBase64 = (file) => {
         return new Promise((resolve, reject) => {
           const reader = new FileReader();
-          reader.readAsDataURL(file); // This gives full base64 Data URI
+          reader.readAsDataURL(file);
           reader.onload = () => resolve(reader.result);
           reader.onerror = (error) => reject(error);
         });
@@ -40,48 +44,57 @@ export default function ImageUploadPage() {
 
       try {
         const base64Image = await getBase64(values.image);
-        console.log("Base64 Data URI:", base64Image);
-
-        // Prepare headers and payload
         const headers = {
-          Authorization: `Bearer msy_dummy_api_key_for_test_mode_12345678`, // Replace or hardcode your token if needed
+          Authorization: `Bearer msy_dummy_api_key_for_test_mode_12345678`, // Replace with real token
         };
 
         const payload = {
-          image_url: base64Image, // Pass base64 Data URI here
+          image_url: base64Image,
           enable_pbr: true,
           should_remesh: true,
           should_texture: true,
         };
 
         const response = await axios.post(
-          'https://api.meshy.ai/openapi/v1/image-to-3d',
+          "https://api.meshy.ai/openapi/v1/image-to-3d",
           payload,
           { headers }
         );
 
-        console.log("Meshy API response:", response);
+        console.log("Upload response:", response);
+
         const taskId = response.data.result;
 
-        try {
-          const response = await axios.get(
-            `https://api.meshy.ai/openapi/v1/image-to-3d/${taskId}`,
-            { headers }
-          );
-          console.log("get response.data",response.data);
-        } catch (error) {
-          console.error(error);
-        }
-        // You can now use response.data.task_id to poll the status
+        // Poll for status every 5s
+        const pollInterval = setInterval(async () => {
+          try {
+            const pollRes = await axios.get(
+              `https://api.meshy.ai/openapi/v1/image-to-3d/${taskId}`,
+              { headers }
+            );
+
+            console.log("Polling response:", pollRes);
+            const status = pollRes.data.status;
+
+            if (status === "SUCCEEDED") {
+              clearInterval(pollInterval);
+              const glbUrl = pollRes.data.model_urls.glb;
+              setModelUrl(glbUrl);
+            } else if (status === "FAILED") {
+              clearInterval(pollInterval);
+              alert("3D model generation failed.");
+            }
+          } catch (err) {
+            clearInterval(pollInterval);
+            console.error("Polling error:", err);
+          }
+        }, 5000);
       } catch (error) {
         console.error("Error uploading to Meshy:", error);
         alert("Image upload failed");
       }
     },
-
   });
-
-
 
   const handleImageChange = (event) => {
     const file = event.currentTarget.files?.[0];
@@ -94,8 +107,9 @@ export default function ImageUploadPage() {
   const handleRemoveImage = () => {
     formik.setFieldValue("image", null);
     setPreview(null);
+    setModelUrl(null);
     if (fileInputRef.current) {
-      fileInputRef.current.value = ""; // reset the file input
+      fileInputRef.current.value = "";
     }
   };
 
@@ -108,10 +122,7 @@ export default function ImageUploadPage() {
         className="bg-white dark:bg-neutral-900 shadow-lg rounded-2xl p-6 w-full max-w-md space-y-6 border border-neutral-200 dark:border-neutral-700"
       >
         <div className="space-y-2">
-          <label
-            htmlFor="image"
-            className="block text-sm font-medium text-[--foreground]"
-          >
+          <label htmlFor="image" className="block text-sm font-medium">
             Choose an image
           </label>
           <input
@@ -156,6 +167,19 @@ export default function ImageUploadPage() {
           Upload Image
         </button>
       </form>
+
+      {modelUrl && (
+        <div className="w-full h-[500px] mt-10">
+          <Canvas>
+            <ambientLight intensity={0.5} />
+            <directionalLight position={[0, 0, 5]} />
+            <Stage environment="city" intensity={0.6}>
+              <ModelViewer url={modelUrl} />
+            </Stage>
+            <OrbitControls />
+          </Canvas>
+        </div>
+      )}
     </div>
   );
 }

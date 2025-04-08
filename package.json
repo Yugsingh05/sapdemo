@@ -9,6 +9,8 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@react-three/drei": "^10.0.6",
+    "@react-three/fiber": "^9.1.2",
     "axios": "^1.8.4",
     "formik": "^2.4.6",
     "lucide-react": "^0.487.0",
@@ -16,6 +18,7 @@
     "next-images": "^1.8.5",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
+    "three": "^0.175.0",
     "yup": "^1.6.1"
   },
   "devDependencies": {
