@@ -1,11 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useFormik } from "formik";
 import * as Yup from "yup";
+import { X } from "lucide-react";
 
 export default function ImageUploadPage() {
   const [preview, setPreview] = useState(null);
+  const fileInputRef = useRef(null); // ref for the file input
 
   const formik = useFormik({
     initialValues: {
@@ -35,6 +37,14 @@ export default function ImageUploadPage() {
     }
   };
 
+  const handleRemoveImage = () => {
+    formik.setFieldValue("image", null);
+    setPreview(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = ""; // reset the file input
+    }
+  };
+
   return (
     <div className="flex flex-col items-center justify-center min-h-screen px-4 py-10 bg-[--background] text-[--foreground]">
       <h1 className="text-3xl font-bold mb-6">Upload Your Image</h1>
@@ -51,6 +61,7 @@ export default function ImageUploadPage() {
             Choose an image
           </label>
           <input
+            ref={fileInputRef}
             id="image"
             name="image"
             type="file"
@@ -64,13 +75,23 @@ export default function ImageUploadPage() {
         </div>
 
         {preview && (
-          <div className="mt-4">
+          <div className="relative mt-4">
             <p className="text-sm font-medium mb-2">Preview:</p>
-            <img
-              src={preview}
-              alt="Preview"
-              className="rounded-xl max-h-60 object-contain border border-neutral-300 dark:border-neutral-600"
-            />
+            <div className="relative">
+              <img
+                src={preview}
+                alt="Preview"
+                className="rounded-xl max-h-60 object-contain border border-neutral-300 dark:border-neutral-600 w-full"
+              />
+              <button
+                type="button"
+                onClick={handleRemoveImage}
+                className="absolute top-2 right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600 transition"
+                aria-label="Remove image"
+              >
+                <X size={16} />
+              </button>
+            </div>
           </div>
         )}
 
