@@ -4,6 +4,7 @@ import { useState, useRef } from "react";
 import { useFormik } from "formik";
 import * as Yup from "yup";
 import { X } from "lucide-react";
+import axios from "axios";
 
 export default function ImageUploadPage() {
   const [preview, setPreview] = useState(null);
@@ -23,11 +24,52 @@ export default function ImageUploadPage() {
             value && ["image/jpeg", "image/png", "image/webp"].includes(value.type)
         ),
     }),
-    onSubmit: (values) => {
-      console.log("Image uploaded:", values.image);
-      alert("Image uploaded successfully!");
+    onSubmit: async (values) => {
+      console.log("Image file:", values.image);
+    
+      // Convert file to base64 Data URI
+      const getBase64 = (file) => {
+        return new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.readAsDataURL(file); // This gives full base64 Data URI
+          reader.onload = () => resolve(reader.result);
+          reader.onerror = (error) => reject(error);
+        });
+      };
+    
+      try {
+        const base64Image = await getBase64(values.image);
+        console.log("Base64 Data URI:", base64Image);
+    
+        // Prepare headers and payload
+        const headers = {
+          Authorization: `Bearer msy_dummy_api_key_for_test_mode_12345678`, // Replace or hardcode your token if needed
+        };
+    
+        const payload = {
+          image_url: base64Image, // Pass base64 Data URI here
+          enable_pbr: true,
+          should_remesh: true,
+          should_texture: true,
+        };
+    
+        const response = await axios.post(
+          'https://api.meshy.ai/openapi/v1/image-to-3d',
+          payload,
+          { headers }
+        );
+    
+        console.log("Meshy API response:", response);
+        // You can now use response.data.task_id to poll the status
+      } catch (error) {
+        console.error("Error uploading to Meshy:", error);
+        alert("Image upload failed");
+      }
     },
+    
   });
+  
+  
 
   const handleImageChange = (event) => {
     const file = event.currentTarget.files?.[0];
